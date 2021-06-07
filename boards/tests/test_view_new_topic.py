@@ -2,13 +2,15 @@ from django.test import TestCase
 from django.urls import resolve, reverse
 from django.contrib.auth.models import User
 
-from ..models import Board, Topic
-from ..views import board_topics, new_topic
+from ..forms import NewTopicForm
+from ..models import Board, Post, Topic
+from ..views import new_topic
 
 class NewTopicTests(TestCase):
     def setUp(self):
         Board.objects.create(name='Django', descrption='Django board.')
         User.objects.create_user(username='john', email='john@doe.com', password='123')
+        self.client.login(username='john', password='123')
 
     def test_new_topic_view_success_status_code(self):
         url = reverse('new_topic', kwargs={'pk': 1})
