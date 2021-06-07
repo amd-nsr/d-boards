@@ -30,6 +30,7 @@ class Post(models.Model):
     topic = models.ForeignKey(Topic, related_name='posts', on_delete=models.CASCADE)
     created_by = models.ForeignKey(User, related_name='posts', on_delete=models.CASCADE)
     updated_by = models.ForeignKey(User, null=True , related_name='+', on_delete=models.CASCADE)
+    
     def __str__(self):
         truncated_message = Truncator(self.message)
         return truncated_message.chars(30)
