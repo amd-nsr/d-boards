@@ -4,7 +4,7 @@ from django.urls import resolve, reverse
 
 from ..forms import NewTopicForm
 from ..models import Board, Post, Topic
-from ..views import new_topic, board_topics
+from ..views import new_topic, TopicListView
 
 class BoardTopicsTests(TestCase):
     def setUp(self):
@@ -22,7 +22,7 @@ class BoardTopicsTests(TestCase):
     
     def test_board_topics_url_resolves_board_topics_view(self):
         view = resolve('/boards/1/')
-        self.assertEquals(view.func, board_topics)
+        self.assertEquals(view.func.view_class, TopicListView)
 
     def test_board_topics_view_contains_navigation_links(self):
             board_topics_url = reverse('board_topics', kwargs={'pk': 1})

@@ -6,21 +6,52 @@ from django.http import HttpResponse
 from django.db.models import Count
 from django.utils import timezone
 #from django.views.generic import View  # this import to use the generic based view
-from django.views.generic import CreateView, UpdateView
+from django.views.generic import CreateView, UpdateView, ListView
 from django.urls import reverse_lazy, reverse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from boards.models import Board, Topic, Post
 from .forms import NewTopicForm, PostForm
 
-def home(request):
-    boards = Board.objects.all()
-    return render(request, 'home.html', {'boards':boards})
+class BoardListView(ListView):
+    model = Board
+    context_object_name = 'boards'
+    template_name = 'home.html'
 
+# This class uses the GCBV Generic Class Based View to to paginate the topics page
+class TopicListView(ListView):
+    model = Topic
+    context_object_name = 'topics'
+    template_name = 'topics.html'
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        kwargs['board'] = self.board
+        return super().get_context_data(**kwargs)
+
+    def get_queryset(self):
+        self.board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
+        queryset = self.board.topics.order_by('-last_update').annotate(replies=Count('posts') - 1)
+        return queryset
+
+# This is a FBV implemintation to paginate the topics page
+'''
 def board_topics(request, pk):
     board = get_object_or_404(Board, pk=pk)
-    topics = board.topics.order_by('-last_update').annotate(replies=Count('posts') - 1)
-    return render(request, 'topics.html', {'board': board, 'topics':topics})
+    queryset  = board.topics.order_by('-last_update').annotate(replies=Count('posts') - 1)
+    page = request.GET.get('page', 1)
+    
+    paginator = Paginator(queryset, 10)
 
+    try:
+        topics = paginator.page(page)
+    except PageNotAnInteger:
+        topics = paginator.page(1)
+    except EmptyPage:
+        topics = paginator.page(paginator.num_pages)
+
+    return render(request, 'topics.html', {'board': board, 'topics': topics})
+'''
 @login_required
 def new_topic(request, pk):
     board = get_object_or_404(Board, pk=pk)
@@ -42,11 +73,36 @@ def new_topic(request, pk):
         form = NewTopicForm()
     return render(request, 'new_topic.html', {'board': board, 'form': form})
 
+# This class uses the GCBV Generic Class Based View to to paginate the posts page
+class PostListView(ListView):
+    model = Post
+    context_object_name = 'posts'
+    template_name = 'topic_posts.html'
+    paginate_by = 4
+
+    def get_context_data(self, **kwargs):
+        session_key = 'viewed_topic_{}'.format(self.topic.pk)
+        if not self.request.session.get(session_key, False):
+            self.topic.views += 1
+            self.topic.save()
+            self.request.session[session_key] = True           
+
+        kwargs['topic'] = self.topic
+        return super().get_context_data(**kwargs)
+
+    def get_queryset(self):
+        self.topic = get_object_or_404(Topic, board__pk=self.kwargs.get('pk'), pk=self.kwargs.get('topic_pk'))
+        queryset = self.topic.posts.order_by('created_at')
+        return queryset
+
+# This is a FBV implemintation to the posts page but without pagination
+'''
 def topic_posts(request, pk, topic_pk):
     topic = get_object_or_404(Topic, board__pk=pk, pk=topic_pk)
     topic.views += 1
     topic.save()
     return render(request, 'topic_posts.html', {'topic': topic})
+'''
 
 @login_required
 def reply_topic(request, pk, topic_pk):
@@ -58,7 +114,18 @@ def reply_topic(request, pk, topic_pk):
             post.topic = topic
             post.created_by = request.user
             post.save()
-            return redirect('topic_posts', pk=pk, topic_pk=topic_pk)
+            
+            topic.last_update = timezone.now() 
+            topic.save()                         
+
+            topic_url = reverse('topic_posts', kwargs={'pk': pk, 'topic_pk': topic_pk})
+            topic_post_url = '{url}?page={page}#{id}'.format(
+                url=topic_url,
+                id=post.pk,
+                page=topic.get_page_count()
+            )
+
+            return redirect(topic_post_url)
     else:
         form = PostForm()
     return render(request, 'reply_topic.html', {'topic': topic, 'form': form})
