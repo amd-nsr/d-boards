@@ -6,7 +6,7 @@ from decouple import config
 
 SECRET_KEY = os.environ['SECRET_KEY']
 DEBUG = False
-ALLOWED_HOSTS = ['0.0.0.0', 'localhost']
+ALLOWED_HOSTS = ['d-boards.herokuapp.com']
 os.environ['DJANGO_SETTINGS_MODULE'] = 'main.settings.production'
 DATABASES = {
     'default': dj_database_url.config(
